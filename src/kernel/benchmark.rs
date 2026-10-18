@@ -29,14 +29,14 @@ impl<F: Float + CubeElement> Benchmark for ReductionBench<F> {
     }
 
     fn execute(&self, input: Self::Input) -> Result<Self::Output, String> {
-        let output_shape: Vec<usize> = vec![self.input_shape[0]];
+        let output_shape: Vec<usize> = self.input_shape[..2].to_vec();
         let output = GpuTensor::<F>::empty(output_shape, &self.client);
 
         unsafe {
             reduce_matrix::launch_unchecked::<F>(
                 &self.client,
                 CubeCount::Static(1, 1, 1),
-                CubeDim::new_1d(self.input_shape[0] as u32), // Add parallelization on the first
+                CubeDim::new_2d(self.input_shape[0] as u32, self.input_shape[1] as u32), // Add parallelization on the first
                 VECTOR_SIZE,
                 // dimension
                 input.as_arg(),
@@ -65,26 +65,36 @@ fn reduce_matrix<F: Float, N: Size>(input: &Tensor<Vector<F, N>>, output: &mut T
     // }
     // output[row] = acc;
     // vectorization + parallelization
-    let row = UNIT_POS_X as usize;
-    let offset = row * input.stride(0) / N::value();
+    // let row = UNIT_POS_X as usize;
+    // let offset = row * input.stride(0) / N::value();
+    // let mut acc = Vector::<F, N>::new(F::new(0.0_f32));
+    // for i in 0..input.shape(1) / N::value() {
+    //     acc += input[offset + i]
+    // }
+    // output[row] = acc.vector_sum()
+    // parallel reduction 3d
+    let x = UNIT_POS_X as usize;
+    let y = UNIT_POS_Y as usize;
+    let offset = (x * input.stride(0) + y * input.stride(1)) / N::value();
     let mut acc = Vector::<F, N>::new(F::new(0.0_f32));
-    for i in 0..input.shape(1) / N::value() {
-        acc += input[offset + i]
+    for i in 0..input.shape(2) / N::value() {
+        acc += input[offset + i];
     }
-    output[row] = acc.vector_sum()
+    let row = x * output.stride(0) + y;
+    output[row] = acc.vector_sum();
 }
 
 pub fn launch<F: Float + CubeElement>(device: &Device) {
     let client = device.client();
 
     let bench1 = ReductionBench::<F> {
-        input_shape: vec![512, 8 * 1024],
+        input_shape: vec![64, 256, 1024],
         client: client.clone(),
         _f: PhantomData,
     };
 
     let bench2 = ReductionBench::<F> {
-        input_shape: vec![128, 32 * 1024],
+        input_shape: vec![64, 64, 4096],
         client: client.clone(),
         _f: PhantomData,
     };
@@ -147,7 +157,7 @@ pub fn launch<F: Float + CubeElement>(device: &Device) {
 //   Min         5.643ms
 //   Max         7.246ms
 // ―――――――――――――――――――――――――
-//
+// parallelization + vectorization
 // wgpu<wgsl>-reduction-[512, 8192]
 //
 // ―――――――― Result ―――――――――
@@ -170,3 +180,27 @@ pub fn launch<F: Float + CubeElement>(device: &Device) {
 //   Min         2.911ms
 //   Max         6.599ms
 // ―――――――――――――――――――――――――
+// 3d parallel reduction
+//wgpu<wgsl>-reduction-[64, 256, 1024]
+//
+// ―――――――― Result ―――――――――
+//   Timing      system
+//   Samples     15
+//   Mean        87.366µs
+//   Variance    0.000ns
+//   Median      88.166µs
+//   Min         67.333µs
+//   Max         92.125µs
+// ―――――――――――――――――――――――――
+// wgpu<wgsl>-reduction-[64, 64, 4096]
+//
+// ―――――――― Result ―――――――――
+//   Timing      system
+//   Samples     15
+//   Mean        75.039µs
+//   Variance    0.000ns
+//   Median      73.125µs
+//   Min         72.250µs
+//   Max         98.875µs
+// ―――――――――――――――――――――――――
+//
