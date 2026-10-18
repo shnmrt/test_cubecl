@@ -10,6 +10,8 @@ pub struct ReductionBench<F: Float + CubeElement> {
     _f: PhantomData<F>,
 }
 
+const VECTOR_SIZE: usize = 4;
+
 impl<F: Float + CubeElement> Benchmark for ReductionBench<F> {
     type Input = GpuTensor<F>;
     type Output = GpuTensor<F>;
@@ -35,6 +37,7 @@ impl<F: Float + CubeElement> Benchmark for ReductionBench<F> {
                 &self.client,
                 CubeCount::Static(1, 1, 1),
                 CubeDim::new_1d(self.input_shape[0] as u32), // Add parallelization on the first
+                VECTOR_SIZE,
                 // dimension
                 input.as_arg(),
                 output.as_arg(),
@@ -45,7 +48,8 @@ impl<F: Float + CubeElement> Benchmark for ReductionBench<F> {
 }
 
 #[cube(launch_unchecked)]
-fn reduce_matrix<F: Float>(input: &Tensor<F>, output: &mut Tensor<F>) {
+fn reduce_matrix<F: Float, N: Size>(input: &Tensor<Vector<F, N>>, output: &mut Tensor<F>) {
+    // non-paralization
     // for row in 0..input.shape(0) {
     //     let mut acc = F::new(0.0_f32);
     //     for col in 0..input.shape(1) {
@@ -53,12 +57,21 @@ fn reduce_matrix<F: Float>(input: &Tensor<F>, output: &mut Tensor<F>) {
     //     }
     //     output[row] = acc;
     // }
+    // parallelization
+    // let row = UNIT_POS_X as usize;
+    // let mut acc = F::new(0.0_f32);
+    // for col in 0..input.shape(1) {
+    //     acc += input[row * input.stride(0) + col];
+    // }
+    // output[row] = acc;
+    // vectorization + parallelization
     let row = UNIT_POS_X as usize;
-    let mut acc = F::new(0.0_f32);
-    for col in 0..input.shape(1) {
-        acc += input[row * input.stride(0) + col];
+    let offset = row * input.stride(0) / N::value();
+    let mut acc = Vector::<F, N>::new(F::new(0.0_f32));
+    for i in 0..input.shape(1) / N::value() {
+        acc += input[offset + i]
     }
-    output[row] = acc;
+    output[row] = acc.vector_sum()
 }
 
 pub fn launch<F: Float + CubeElement>(device: &Device) {
@@ -86,3 +99,74 @@ pub fn launch<F: Float + CubeElement>(device: &Device) {
         );
     }
 }
+
+// No parallelization
+// wgpu<wgsl>-reduction-[512, 8192]
+//
+// ―――――――― Result ―――――――――
+//   Timing      system
+//   Samples     15
+//   Mean        477.290ms
+//   Variance    123.000ns
+//   Median      477.374ms
+//   Min         476.408ms
+//   Max         477.916ms
+// ―――――――――――――――――――――――――
+// wgpu<wgsl>-reduction-[128, 32768]
+//
+// ―――――――― Result ―――――――――
+//   Timing      system
+//   Samples     15
+//   Mean        474.774ms
+//   Variance    104.000ns
+//   Median      474.837ms
+//   Min         474.114ms
+//   Max         475.147ms
+// ―――――――――――――――――――――――――
+//
+
+// with parallelization
+// wgpu<wgsl>-reduction-[512, 8192]
+// ―――――――― Result ―――――――――
+//   Timing      system
+//   Samples     15
+//   Mean        5.516ms
+//   Variance    290.000ns
+//   Median      5.464ms
+//   Min         4.857ms
+//   Max         6.331ms
+// ―――――――――――――――――――――――――
+// wgpu<wgsl>-reduction-[128, 32768]
+//
+// ―――――――― Result ―――――――――
+//   Timing      system
+//   Samples     15
+//   Mean        6.390ms
+//   Variance    239.000ns
+//   Median      6.440ms
+//   Min         5.643ms
+//   Max         7.246ms
+// ―――――――――――――――――――――――――
+//
+// wgpu<wgsl>-reduction-[512, 8192]
+//
+// ―――――――― Result ―――――――――
+//   Timing      system
+//   Samples     15
+//   Mean        4.150ms
+//   Variance    10.000ns
+//   Median      4.131ms
+//   Min         4.063ms
+//   Max         4.518ms
+// ―――――――――――――――――――――――――
+// wgpu<wgsl>-reduction-[128, 32768]
+//
+// ―――――――― Result ―――――――――
+//   Timing      system
+//   Samples     15
+//   Mean        5.173ms
+//   Variance    1.141µs
+//   Median      5.611ms
+//   Min         2.911ms
+//   Max         6.599ms
+// ―――――――――――――――――――――――――
