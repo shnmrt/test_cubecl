@@ -34,7 +34,8 @@ impl<F: Float + CubeElement> Benchmark for ReductionBench<F> {
             reduce_matrix::launch_unchecked::<F>(
                 &self.client,
                 CubeCount::Static(1, 1, 1),
-                CubeDim::new_1d(1),
+                CubeDim::new_1d(self.input_shape[0] as u32), // Add parallelization on the first
+                // dimension
                 input.as_arg(),
                 output.as_arg(),
             );
@@ -45,13 +46,19 @@ impl<F: Float + CubeElement> Benchmark for ReductionBench<F> {
 
 #[cube(launch_unchecked)]
 fn reduce_matrix<F: Float>(input: &Tensor<F>, output: &mut Tensor<F>) {
-    for row in 0..input.shape(0) {
-        let mut acc = F::new(0.0_f32);
-        for col in 0..input.shape(1) {
-            acc += input[row * input.stride(0) + col];
-        }
-        output[row] = acc;
+    // for row in 0..input.shape(0) {
+    //     let mut acc = F::new(0.0_f32);
+    //     for col in 0..input.shape(1) {
+    //         acc += input[row * input.stride(0) + col];
+    //     }
+    //     output[row] = acc;
+    // }
+    let row = UNIT_POS_X as usize;
+    let mut acc = F::new(0.0_f32);
+    for col in 0..input.shape(1) {
+        acc += input[row * input.stride(0) + col];
     }
+    output[row] = acc;
 }
 
 pub fn launch<F: Float + CubeElement>(device: &Device) {
