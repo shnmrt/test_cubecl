@@ -18,6 +18,7 @@ fn gelu_scalar<F: Float, N: Size>(x: Vector<F, N>) -> Vector<F, N> {
     x * (Vector::erf(tmp) + Vector::one()) / Vector::new(F::new(2.0_f32))
 }
 
+#[allow(dead_code)]
 pub fn launch(device: &Device) {
     let client = device.client();
     let input = [-200., -100., -1., 0., 1., 5., 10., 100.];

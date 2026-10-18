@@ -8,7 +8,7 @@ fn mul_kernel<F: Float>(a: &[F], b: &[F], out: &mut [F]) {
         out[ABSOLUTE_POS] = a[ABSOLUTE_POS] * b[ABSOLUTE_POS]
     }
 }
-
+#[allow(dead_code)]
 pub fn launch(device: &Device) {
     let client = device.client();
     const N: usize = 5_000_000;

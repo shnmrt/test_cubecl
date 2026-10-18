@@ -1,8 +1,8 @@
 mod kernel;
 
-use crate::kernel::cputensor;
+// use crate::kernel::cputensor;
 use kernel::gputensor;
-use kernel::{add_kernel, gelu, mul_kernel, pow_kernel};
+// use kernel::{add_kernel, gelu, mul_kernel, pow_kernel};
 
 fn main() {
     // mul_kernel::launch(&cubecl::Device::default());

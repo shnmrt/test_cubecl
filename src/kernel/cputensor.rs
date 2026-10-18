@@ -19,6 +19,7 @@ fn compact_strides(shape: &[usize]) -> Vec<usize> {
     strides
 }
 
+#[allow(dead_code)]
 impl CpuTensor {
     /// Create CpuTensor with a shape filled by number in order
     pub fn arange(shape: Vec<usize>) -> Self {
@@ -53,7 +54,7 @@ impl CpuTensor {
 /// [0 1 2]    [0 + 1 + 2]    [3 ]
 /// [3 4 5] -> [3 + 4 + 5] -> [12]
 /// [6 7 8]    [6 + 7 + 8]    [21]
-
+#[allow(dead_code)]
 fn reduce_matrix(input: &CpuTensor, output: &mut CpuTensor) {
     for i in 0..input.shape[0] {
         let mut acc = 0.0_f32;
@@ -64,6 +65,7 @@ fn reduce_matrix(input: &CpuTensor, output: &mut CpuTensor) {
     }
 }
 
+#[allow(dead_code)]
 pub fn launch() {
     let input_shape = vec![3, 3];
     let output_shape = vec![3];
