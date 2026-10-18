@@ -45,6 +45,7 @@ impl<F: Float + CubeElement> GpuTensor<F> {
             )
         }
     }
+    #[allow(dead_code)]
     /// Return the data from the client
     pub fn read(self, client: &Client) -> Vec<F> {
         let bytes = client
@@ -64,7 +65,7 @@ fn reduce_matrix<F: Float>(input: &Tensor<F>, output: &mut Tensor<F>) {
         output[row] = acc;
     }
 }
-
+#[allow(dead_code)]
 pub fn launch<F: Float + CubeElement>(device: &Device) {
     let client = device.client();
 
